@@ -1,0 +1,126 @@
+---
+title: "HW3_Applied"
+author: "Jon Griffith"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ISLR2)
+```
+
+## 8
+
+```{r}
+head(Auto)
+```
+
+### (a)
+```{r}
+mod <- lm(mpg ~ horsepower, data=Auto)
+summary(mod)
+```
+Comments:
+
+(i) There is a statistically significant relationship between the predictor and the response, with a very low p-value observed.
+
+(ii) The relationship between the predictor and the response is very strong with a p-value of essentially zero. The predictor estimated effect on the response is approximately 24 standard deviations away from what we'd expect under the null hypothesis.
+
+(iii) The relationship between the predictor and the response is negative
+
+(iv)
+```{r}
+conf_int <- predict(mod, data.frame(horsepower = 98), interval = 'confidence')
+pred_int <- predict(mod, data.frame(horsepower = 98), interval = 'prediction')
+
+paste('95% Confidence Interval:')
+conf_int
+paste('95% Prediction Interval:')
+pred_int
+```
+We can see the prediction above in the 'fit' column where a value of 98 for horsepower translates to a prediction of approximately 24.47 mpg. The first interval represents a 95% confidence interval while the second is a 95% prediction interval. Notice that the latter is more wide since this is an interval over a specific value prediction rather than the average value prediction.
+
+
+### (b)
+```{r}
+plot(Auto$horsepower, Auto$mpg,
+     xlab = 'Horsepower',
+     ylab = 'MPG',
+     main = 'MPG VS Horsepower w/ Regression Line')
+abline(mod, col='red', lwd=2)
+```
+
+
+```{r}
+par(mfrow=c(2,2))
+plot(mod)
+```
+We can see that the residuals appear to be slightly heteroskedastic and nonlinear. This makes sense since the above plot shows a linear fit to a nonlinear scatter. 
+
+
+## 9 - Multiple linear regression on the Auto data set
+
+### (a)
+```{r}
+pairs(Auto)
+```
+
+### (b)
+```{r}
+df_sub <- Auto[,-length(names(Auto))]
+cormat <- cor(df_sub)
+cormat
+```
+
+### (c)
+```{r}
+mod2 <- lm(mpg ~ .-name, data=Auto)
+summary(mod2)
+```
+The summary shows that we have four statistically significant variables that have an effect on the response. These variables are displacement, weight, year, and origin. Now we see that horsepower is not statistically significant, despite being so in the simple linear regression. This is due to horsepower being highly correlated with other variables and essentially being a proxy for those variables in the single regression. Now that those other variables are included, we can see that horsepower does not appear to be causal.
+
+### (d)
+```{r}
+par(mfrow=c(2,2))
+plot(mod2)
+```
+We can see that the residuals appear to be more random than before with no obvious correlations. Though the variance still seems slightly heteroskedastic. We don't observe any high leverage points according to Cook's distance. All points fall within the Cook's distance bounds.
+
+## 12 - Simple linear regression w/o an intercept
+
+### (a)
+We will see $\hat{\beta}$ be equal between regressing X onto Y and vice versa when
+$$\sum x_i^2 = \sum y_i^2.$$
+
+### (b)
+```{r}
+n <- 100
+
+x <- rnorm(n)
+y <- 5*x + rnorm(n)
+
+B1 <- sum(x*y) / sum(x^2)
+B2 <- sum(x*y) / sum(y^2)
+
+paste('Beta of Y regressed on X:', B1)
+paste('Beta of X regressed on Y:', B2)
+```
+
+### (c)
+```{r}
+set.seed(560)
+n <- 100
+
+x <- rnorm(100)
+y <- sample(x, n)
+
+B1 <- sum(x*y) / sum(x^2)
+B2 <- sum(x*y) / sum(y^2)
+
+paste('Beta of Y regressed on X:', B1)
+paste('Beta of X regressed on Y:', B2)
+```
