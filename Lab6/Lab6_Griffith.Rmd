@@ -1,0 +1,19 @@
+---
+title: "Lab 6"
+author: "Jonathan Griffith"
+date: "2025-04-17"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 6.5.2 Ridge Regression and the Lasso
+
+```{r}
+library(ISLR2)
+library(glmnet)
+```
+
+## Best Subset Selection
