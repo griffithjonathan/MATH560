@@ -1,0 +1,302 @@
+---
+title: "HW4"
+author: "Jon Griffith and Lauren Quesada"
+date: "2025-04-07"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 10
+
+```{r}
+library(ISLR2)
+```
+
+### (a)
+
+```{r}
+df <- Carseats
+
+fit <- lm(Sales ~ Price + Urban + US, data=df)
+summary(fit)
+```
+
+### (b)
+
+The coefficient for 'Price' can be interpreted as for each dollar increase in Price, you can expect the number of carseats sold to go down by approximately 54 units. 
+
+The coefficient for 'UrbanYes' can be interpreted as stores located in urban areas sell, on average, approximately 22 fewer units than stores located in rural areas. 
+
+The coefficient for 'USYes' can be interpreted as stores located in the US sell, on average, approximately 1200 more units than stores not located in the US.
+
+The 'Price' and 'US' variables are both statistically significant while the 'Urban' variable is not.
+
+### (c)
+
+$Sales = 13.043 - 0.054 (\text{Price}) - 0.022 (I_{Urban='Yes'}) + 1.2 (I_{US='Yes'})$
+
+### (d)
+
+We can reject the null hypothesis for the 'Urban' variable.
+
+### (e)
+
+```{r}
+fit2 <- lm(Sales ~ Price + US, data = df)
+summary(fit2)
+```
+
+### (f)
+
+The first model has an adjusted R-squared of 0.2335 while the second model has an adjusted R-squared of 0.2354, suggesting a better fit for the second model with one less variable. This also means that each model accounts for about 23.54 percent of variation in the predictions for sales. Whether this is a good or bad fit is subjective, but it seems like a poor fit since the goal here is presumably to make business decisions based on predicted unit sales. If these predictions aren't very accurate, you would not want to make important decisions based on these models.
+
+### (g)
+
+```{r}
+confint(fit2, level=0.95)
+```
+
+### (h)
+
+```{r}
+par(mfrow=c(2,2))
+plot(fit2)
+#plot(fit2, which=5)
+```
+
+Based on the residual plots above, there does not appear to be any outliers or high leverage points in the dataset. There are a few points in the Residuals vs Leverage plot that appear to have high leverage relative to the rest of the points, but do not appear to be a big problem according to Cook's distance. All points along the QQ plot suggest a normal distribution with no sign of outliers.
+
+
+## 13
+
+### (a) - (c)
+
+```{r}
+set.seed(1)
+
+x <- rnorm(100)
+eps <- rnorm(100, 0, sd=0.25)
+y <- -1 + 0.5*x + eps
+```
+
+Vector 'y' has a length of 100. For this model, $\beta_0 = -1$ and $\beta_1 = 0.5$. 
+
+### (d)
+
+```{r}
+plot(x, y)
+```
+We observe a positive linear relationship between x and y, which accurately reflects our ground truth of both variables.
+
+
+### (e)
+
+```{r}
+fit_e <- lm(y ~ x)
+summary(fit_e)
+```
+
+The model has a statistically significant $\hat{\beta}_0 = -1.009$ for the intercept and $\hat{\beta}_1 = 0.4997$ for 'x', which accurately reflects the true coefficients of $\beta_0 = -1$ and $\beta_1 = 0.5$. We also see that the R-squared is approximately 0.7784 which suggests that 'x' accounts for approximately 77.8 percent of the explained variance for the predictions of 'y'. This also accurately reflects that our error term 'eps' has a variance of 0.25. 
+
+
+
+### (f)
+
+```{r}
+plot(x,y,
+     main='Least Squares Line vs Population Regression Line')
+abline(fit_e, col='red', lwd=2)
+abline(a=-1, b=0.5, col='blue', lwd=2)
+legend('topleft', c('Least Squares Line', 'Population Regression Line'), col=c('red', 'blue'), lwd=2)
+```
+
+### (g)
+
+```{r}
+fit4 <- lm(y ~ x + I(x^2))
+summary(fit4)
+```
+
+There is no evidence that the quadratic term improves the fit of the model. We conclude this based on a high p-value that doesn't beat any standard threshold, therefore we fail to reject the null hypothesis $H_0: \beta_2 = 0$. We also only observe a marginal increase in the adjusted R-squared as further evidence that this does not do much to improve the fit. This makes sense since the true equation is not quadratic.
+
+
+### (h)
+
+```{r}
+set.seed(1)
+
+x <- rnorm(100)
+eps <- rnorm(100, 0, sd=0.125)
+y <- -1 + 0.5*x + eps
+
+fit_h <- lm(y ~ x)
+
+summary(fit_h)
+```
+
+```{r}
+
+plot(x,y,
+     main='Least Squares Line vs Population Regression Line')
+abline(fit_h, col='red', lwd=2)
+abline(a=-1, b=0.5, col='blue', lwd=2)
+legend('topleft', c('Least Squares Line', 'Population Regression Line'), col=c('red', 'blue'), lwd=2)
+```
+
+We see that we have similar values for both $\hat{\beta}_0$ and $\hat{\beta}_1$ which very closely approximate their true values. The variation is now even more explained by this model with an increase in proportion comparable to the decrease in variance for the true function. From the plot, we see that the OLS line is an even better approximation of the population regression line than we saw in the previous model, which makes sense since the data points are tighter around the line due to lower random error.
+
+
+### (i)
+
+```{r}
+set.seed(1)
+
+x <- rnorm(100)
+eps <- rnorm(100, 0, sd=0.5)
+y <- -1 + 0.5*x + eps
+
+fit_i <- lm(y ~ x)
+
+summary(fit_i)
+```
+
+```{r}
+
+plot(x,y,
+     main='Least Squares Line vs Population Regression Line')
+abline(fit_i, col='red', lwd=2)
+abline(a=-1, b=0.5, col='blue', lwd=2)
+legend('topleft', c('Least Squares Line', 'Population Regression Line'), col=c('red', 'blue'), lwd=2)
+```
+
+We once again see similar coefficient estimates for $\hat{\beta}_0$ and $\hat{\beta}_1$ as the previous two models, which closely approximates the true values. We also see a comparable decrease in $R^2$ proportional to variance increase in the error term. As the error term variance goes up to 0.5, we see that we now only explain approximately 46.75 percent of variance which is close to 50 percent. For the plot, we now see that the lines can be differentiated moreso than all previous models meaning that the OLS fit is slightly less accurate (though still very accurate) than the previous models. This makes sense with the increase in the variance for the error term resulting in a larger spread of data points.
+
+```{r}
+cat("Second fit with e ~ N(0, 0.125) \n")
+confint(fit_h)
+cat('\n')
+
+cat("First fit with e ~ N(0, 0.25) \n")
+confint(fit_e)
+cat('\n')
+
+cat("Third fit with e ~ N(0, 0.5) \n")
+confint(fit_i)
+```
+
+We put the models in ascending order in terms of variance for the error term, with the second fit first, the original fit second, and the third fit third. We see that there is a positive correlation with variance in the error term and width of the confidence interval. That is, as the data set becomes more noisy, the range of values in the confidence interval becomes wider. This makes sense since the proportion of the variance explained by the model is also going down, meaning we become less confident in our ability to explain the variance in the response variable y, which also corresponds to a wider range of values for our confidence interval.
+
+
+## 14
+
+### (a)
+
+```{r}
+set.seed(1)
+x1 <- runif(100)
+x2 <- 0.5*x1 + rnorm(100) / 10
+y <- 2 + 2*x1 + 0.3*x2 + rnorm(100)
+```
+
+The linear model has the form
+\begin{align*}
+  Y &= \beta_0 + \beta_1X_1 + \beta_2X_2 + \epsilon \sim N(0,1)\\
+  Y &= 2 + 2X_1 + 0.3X_2 + \epsilon
+\end{align*}
+
+### (b)
+
+```{r}
+plot(x1,x2,
+     main = paste('x1 VS x2\nCorr = ', round(cor(x1,x2),2)))
+
+```
+
+### (c)
+
+```{r}
+fit_14c <- lm(y ~ x1 + x2)
+summary(fit_14c)
+```
+
+The results of this model show that $X_1$ is a statistically significant predictor of $Y$, but $X_2$ is not. This means we can reject the null hypothesis for $\beta_1$ but we can't reject the null hypothesis for $\beta_2$. We also see that only about 20 percent of the variance in the predictions are explained by these variables, based on $R^2$. 
+
+The coefficients are $\beta_0 = 2.13$, $\beta_1 = 1.4396$, and $\beta_2 = 1.0097$. The intercept estimate is accurate while the coefficients for the variables are not, which suggests something is going on (collinearity).
+
+
+### (d)
+
+```{r}
+fit_14d <- lm(y ~ x1)
+summary(fit_14d)
+```
+
+This fit has an even lower p-value for $X_2$ showing that we can still reject the null hypothesis, but this time with a coefficient that approximately matches the true $\beta_1$. It makes sense that the coefficient estimate would match the true value in this case since $X_1$ is independent of $X_2$. 
+
+
+### (e)
+
+```{r}
+fit_14e <- lm(y ~ x2)
+summary(fit_14e)
+```
+
+We see that $X_2$ is now statistically significant meaning we can reject the null that $\beta_2 = 0$. However, the coefficient estimate for $X_2$ does not come close to the true value for $\beta_2$. This makes sense since it is highly correlated with and depends on $X_1$. It is therefore trying to signal the magnitude of the $X_1$ variable's impact on $Y$ through $X_2$ since $X_1$ wasn't included in the model.
+
+
+### (f)
+
+The results in (c)-(e) don't contradict each other since there is a high correlation between $X_1$ and $X_2$. When we include both in the model, we see that $X_1$ impact is being underestimated while $X_2$ is being overestimated, which can be attributed to collinearity. The second model has just $X_1$ which is independent of $X_2$, so we get its isolated impact on the response pretty accurately. The third model with just $X_2$ is statistically significant, but mainly because it is essentially a proxy for both the impact of $X_1$ and itself.
+
+```{r}
+fit_14f <- lm(y ~ x1*x2)
+summary(fit_14f)
+```
+
+### (g)
+
+```{r}
+x1 <- c(x1, 0.1)
+x2 <- c(x2, 0.8)
+y <- c(y, 6)
+
+fitg1 <- lm(y~x1 + x2)
+fitg2 <- lm(y~x1)
+fitg3 <- lm(y~x2)
+```
+
+```{r}
+summary(fitg1)
+summary(fitg2)
+summary(fitg3)
+```
+
+```{r}
+par(mfrow=c(2,2))
+plot(fitg1)
+```
+
+```{r}
+par(mfrow=c(2,2))
+plot(fitg2)
+```
+
+```{r}
+par(mfrow=c(2,2))
+plot(fitg3)
+```
+
+We see that the first model now has $X_2$ being statistically significant meaning we can reject the null hypothesis, while $X_1$ is now not statistically significant and we fail to reject the null in its case. Both of the coefficient estimates are still inaccurate.
+
+For the second and third models, we see that both $X_1$ and $X_2$ are both statistically significant for each of their respective regressions, meaning we can reject the null in both cases. For the model with $X_1$, we see that it still comes close to its true $\beta$ estimate, but not as close as it did before this new observation was introduced. The $\beta$ estimate for $X_2$ is still way off for its respective model.
+
+Looking at the residual plots for each model, we see that there is strong evidence across the board that the new observation is a high leverage point in the first model with both variables since it crosses the highest threshold for Cook's distance in the leverage plot. 
+
+The added observation does not show up as a high leverage point in either of the models with just $X_1$ or $X_2$. However, it does appear to have relatively high leverage for the third model with just $X_2$, just not enough to be a concern based on Cook's distance.
+
+For the second model with just $X_1$, we have evidence that the additional point could be an outlier from looking at the QQ plot and the residuals vs fitted plots. However, we don't appear to have any evidence that the added observation is an outlier in the first or third model with both variables and just $X_2$, respectively.
+
+
