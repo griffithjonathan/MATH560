@@ -14,6 +14,215 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 library(ISLR2)
 library(glmnet)
+library(pls)
 ```
 
-## Best Subset Selection
+We first load in our data and remove missing values. Then we put this data into an X matrix that has dummy variables for qualitative predictors and Y vector that has the Salary data.
+
+```{r}
+Hitters <- na.omit(Hitters)
+sum(is.na(Hitters))
+
+x <- model.matrix(Salary ~ ., Hitters)[,-1]
+y <- Hitters$Salary
+```
+
+## Ridge Regression
+
+We will first fit a ridge regression and provide a wide range of lambda values for different fits.
+
+```{r}
+grid <- 10^seq(10, -2, length=100)
+ridge.mod <- glmnet(x, y, alpha=0, lambda = grid)
+dim(coef(ridge.mod))
+```
+
+Let's look at the coefficient estimates for the model using $\lambda = 11498$. Notice that these estimates are very small relative to those with a smaller lambda.
+```{r}
+ridge.mod$lambda[50]
+coef(ridge.mod)[,50]
+
+#l2 norm for this lambda
+paste('L2 Norm: ', sqrt(sum(coef(ridge.mod)[-1,50]^2)))
+```
+
+Now we look at the coefficients when $\lambda = 705$ along with their l2 norm. We notice that these coefficients are much larger relative to those above with a larger lambda.
+
+```{r}
+ridge.mod$lambda[60]
+coef(ridge.mod)[,60]
+
+paste('L2 Norm: ', sqrt(sum(coef(ridge.mod)[-1,60]^2)))
+```
+
+We can make predictions using this model and input new lambda values to see what coefficients are produced. Below, we'll show the predicted coefficients for $\lambda = 50$.
+
+```{r}
+predict(ridge.mod, s=50, type='coefficients')[1:20,]
+```
+
+Now we will create a train test split to estimate the test error of both ridge and lasso.
+
+```{r}
+set.seed(1)
+
+# Sample the total number of rows without replacement to assign train and test values as a mask
+train <- sample(1:nrow(x), nrow(x) / 2)
+test <- (-train)
+y.test <- y[test]
+```
+
+Now we fit a model using the train set and use this model to make predictions on the test set using $\lambda=4$. We then measure the MSE to see how it performs.
+
+```{r}
+ridge.mod <- glmnet(x[train,], y[train], alpha=0,
+                    lambda = grid, thresh = 1e-12)
+ridge.pred <- predict(ridge.mod, s=4, newx=x[test,])
+mean((ridge.pred - y.test)^2)
+```
+
+To calculate the MSE of a model that just fits the intercept, we can do the following:
+
+```{r}
+mean((mean(y[train]) - y.test)^2)
+```
+
+Fitting a model with a very large lambda is essentially the same as just fitting the intercept, as shown below.
+
+```{r}
+ridge.pred <- predict(ridge.mod, s=1e10, newx = x[test,])
+mean((ridge.pred - y.test)^2)
+```
+
+We'll now compare our model with $\lambda =4$ to standard OLS to see if ridge gives an improvement with this lambda value. Notice below that the coefficients are essentially the same for every predictor suggesting that $\lambda=4$ does not improve much (if at all) on standard OLS.
+
+```{r}
+ridge.pred <- predict(ridge.mod, s = 0, newx = x[test,],
+                      exact = T, x = x[train,], y = y[train])
+mean((ridge.pred - y.test)^2)
+
+lm(y ~ x, subset = train)
+predict(ridge.mod, s = 0, exact = T, type = 'coefficients', x = x[train,], y = y[train])[1:20,]
+```
+
+Now we'll use cross-validation to test a range of lambda values to see if there is an optimal lambda for improvement on OLS. THe default is 10-fold, which we will use.
+
+```{r}
+set.seed(1)
+cv.out <- cv.glmnet(x[train,], y[train], alpha = 0)
+plot(cv.out)
+bestlam <- cv.out$lambda.min
+bestlam
+```
+
+We see that the smallest error is $\lambda = 326$ and now we will check to test the MSE associated with this lambda value.
+
+```{r}
+ridge.pred <- predict(ridge.mod, s = bestlam, newx = x[test,])
+mean((ridge.pred - y.test)^2)
+```
+
+We see an improvement over $\lambda=4$, and we will fit the full dataset to see our coefficient values associated with this lambda value using the full dataset model. Notice that ridge regression includes all variables and doesn't set any equal to like lasso.
+
+```{r}
+out <- glmnet(x, y, alpha=0)
+predict(out, type = 'coefficients', s = bestlam)[1:20,]
+```
+
+## The Lasso
+
+Now we will use the Lasso model and see if that outperforms the ridge and OLS models. Notice in the plot below that some coefficients are set to exactly zero based on the value of lambda.
+
+```{r}
+lasso.mod <- glmnet(x[train,], y[train], alpha=1, lambda=grid)
+plot(lasso.mod)
+```
+
+Next we perform cross-validation and compute the associated test error. Notice that the MSE associated with the optimal lambda from this test is very similar to the lowest MSE associated with optimal lambda in ridge regression. Lasso shows itself to outperform OLS and be similar to Lasso.
+
+```{r}
+set.seed(1)
+cv.out <- cv.glmnet(x[train,], y[train], alpha=1)
+plot(cv.out)
+bestlam <- cv.out$lambda.min
+lasso.pred <- predict(lasso.mod, s = bestlam, newx = x[test,])
+mean((lasso.pred - y.test)^2)
+```
+
+Now we show the number of nonzero coefficient estimates to show the advantage that Lasso has over ridge. We have a sparse model that is more interpretable. We have a resulting 11 nonzero coefficient estimates indicating the 11 variables Lasso produced as the most important.
+
+```{r}
+out <- glmnet(x, y, alpha = 1, lambda = grid)
+lasso.coef <- predict(out, type = 'coefficients', s = bestlam)[1:20,]
+lasso.coef
+```
+
+# 6.5.3 PCR and PLS Regression
+
+Now we move on to principal component regression and partial least squares
+
+## Principal Components Regression
+
+We will first fit a PCR model and use the same 'Hitters' dataset as in the previous section to predict Salary. We will scale each predictor variable to remove any effect from the original scale native to each. We also compute the cross-validation for each possible value of M, the number of principal components used, which is built in to the function and defaults as 10-fold. Below in the summary, we can see how much variance is captured from the predictors in the bottom TRAINING row.
+
+```{r}
+set.seed(2)
+
+pcr.fit <- pcr(Salary ~ ., data = Hitters, scale=TRUE, validation = 'CV')
+
+summary(pcr.fit)
+```
+
+We also plot the cross-validation scores as MSEs. We see below that the MSE is lowest with few components and with many components, with higher values in between, suggesting that we should try a small number of components.
+
+```{r}
+validationplot(pcr.fit, val.type='MSEP')
+```
+
+Now we will perform PCR on the training data and evaluate its test set performance. Notice in the plot of all of the MSEs associated with number of components below that the smallest MSE is associated with five components.
+
+```{r}
+set.seed(1)
+pcr.fit <- pcr(Salary ~ ., data=Hitters, subset=train, scale = TRUE, validation='CV')
+validationplot(pcr.fit, val.type='MSEP')
+```
+
+Now we will compute the test MSE using $M=5$ components. Notice that it is similar to the results form ridge regression and lasso. The downside with PCR is the results aren't very interpretable. We don't know the linear combination of predictor variables used to create these five components.
+
+```{r}
+pcr.pred <- predict(pcr.fit, x[test,], ncomp=5)
+mean((pcr.pred - y.test)^2)
+```
+
+Lastly, we will fit the full data set using PCR and $M=5$ components.
+
+```{r}
+pcr.fit <- pcr(y ~ x, scale = TRUE, ncomp=5)
+summary(pcr.fit)
+```
+
+
+## Partial Least Squares
+
+We will now implement partial least squares using the plsr() function in the same library as with PCR, 'pls'.
+
+```{r}
+set.seed(1)
+pls.fit <- plsr(Salary ~ ., data=Hitters, subset = train, scale=TRUE, validation='CV')
+summary(pls.fit)
+```
+
+We see above that the lowest CV error occurs at $M=1$ partial least squares direction. Now we will evaluate the test set MSE. Notice that it is slightly higher than ridge, lasso, and PCR.
+
+```{r}
+pls.pred <- predict(pls.fit, x[test,], ncomp = 1)
+mean((pls.pred - y.test)^2)
+```
+
+Finally, we perform PLS using the full data set and $M=1$. We see a similar amount of variance explained using $M=1$ as we did in PCR using $M=5$, which makes sense since PLS is accounting for the predictors and the response in explaining variance, rather than just the predictors with PCR.
+
+```{r}
+pls.fit <- plsr(Salary ~ ., data = Hitters, scale=TRUE, ncomp = 1)
+summary(pls.fit)
+```
+
