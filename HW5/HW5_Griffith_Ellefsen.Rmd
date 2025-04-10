@@ -1,0 +1,308 @@
+---
+title: "HW5"
+author: "Jon Griffith and Carla Ellefsen"
+date: "2025-04-14"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(leaps)
+library(ISLR2)
+```
+
+
+# 8.
+
+## (a)-(b)
+
+```{r}
+set.seed(1)
+
+# Generate data
+x <- rnorm(100)
+e <- rnorm(100)
+
+Y <- 1 + 2*x + 3*x^2 + 4*x^3 + e
+
+# Create dataframe and add names to variables in created data frame
+xnames <- c('X1', 'X2', 'X3', 'X4', 'X5', 'X6', 'X7', 'X8', 'X9', 'X10', 'Y')
+df <- cbind(x, x^2, x^3, x^4, x^5, x^6, x^7, x^8, x^9, x^10, Y)
+colnames(df) <- xnames 
+df <- as.data.frame(df)
+```
+
+## (c)
+
+```{r}
+regfit.full <- regsubsets(Y ~ ., data=df, nvmax=10)
+reg.summary <- summary(regfit.full)
+reg.summary
+```
+
+```{r}
+par(mfrow=c(2,2))
+# PLot of cp vs num variables
+plot(reg.summary$cp, 
+     xlab='Number of Variables',
+     ylab='Cp',
+     type='l',
+     main=paste('Optimal:', which.min(reg.summary$cp)))
+abline(v=which.min(reg.summary$cp))
+
+# PLot of adjr2 vs num variables
+plot(reg.summary$adjr2, 
+     xlab='Number of Variables',
+     ylab='Adj R2',
+     type='l',
+     main=paste('Optimal:', which.max(reg.summary$adjr2)))
+abline(v=which.max(reg.summary$adjr2))
+
+# PLot of bic vs num variables
+plot(reg.summary$bic, 
+     xlab='Number of Variables',
+     ylab='BIC',
+     type='l',
+     main=paste('Optimal:', which.min(reg.summary$bic)))
+abline(v=which.min(reg.summary$bic))
+```
+
+We see from the above plots that the optimal number of variables based on each respective measure is 4, 4, and 3 for Cp, Adj R2, and BIC, respectively. We know that BIC favors fewer variables so it is no surprise that this is the one that recommends the fewest. We show the coefficients for model with three and 4 variables below.
+
+```{r}
+coef(regfit.full, 3)
+coef(regfit.full, 4)
+```
+
+Both models chose to include the same predictor variables as the true function. We can see that the three variable model is pretty close to our true function coefficients. The four variable model is also close, but because of the fourth added variable, 'X5', it does not come as close to the true coefficients for the other three.
+
+
+## (d)
+
+```{r}
+regfit.fwd <- regsubsets(Y ~ ., data=df, nvmax=10, method='forward')
+reg.summary <- summary(regfit.fwd)
+reg.summary
+```
+
+```{r}
+par(mfrow=c(2,2))
+# PLot of cp vs num variables
+plot(reg.summary$cp, 
+     xlab='Number of Variables',
+     ylab='Cp',
+     type='l',
+     main=paste('Optimal:', which.min(reg.summary$cp)))
+abline(v=which.min(reg.summary$cp))
+
+# PLot of adjr2 vs num variables
+plot(reg.summary$adjr2, 
+     xlab='Number of Variables',
+     ylab='Adj R2',
+     type='l',
+     main=paste('Optimal:', which.max(reg.summary$adjr2)))
+abline(v=which.max(reg.summary$adjr2))
+
+# PLot of bic vs num variables
+plot(reg.summary$bic, 
+     xlab='Number of Variables',
+     ylab='BIC',
+     type='l',
+     main=paste('Optimal:', which.min(reg.summary$bic)))
+abline(v=which.min(reg.summary$bic))
+```
+
+```{r}
+regfit.bwd <- regsubsets(Y ~ ., data=df, nvmax=10, method='backward')
+reg.summary <- summary(regfit.bwd)
+reg.summary
+```
+
+```{r}
+par(mfrow=c(2,2))
+# PLot of cp vs num variables
+plot(reg.summary$cp, 
+     xlab='Number of Variables',
+     ylab='Cp',
+     type='l',
+     main=paste('Optimal:', which.min(reg.summary$cp)))
+abline(v=which.min(reg.summary$cp))
+
+# PLot of adjr2 vs num variables
+plot(reg.summary$adjr2, 
+     xlab='Number of Variables',
+     ylab='Adj R2',
+     type='l',
+     main=paste('Optimal:', which.max(reg.summary$adjr2)))
+abline(v=which.max(reg.summary$adjr2))
+
+# PLot of bic vs num variables
+plot(reg.summary$bic, 
+     xlab='Number of Variables',
+     ylab='BIC',
+     type='l',
+     main=paste('Optimal:', which.min(reg.summary$bic)))
+abline(v=which.min(reg.summary$bic))
+```
+
+```{r}
+paste('Forward Stepwise Regression')
+coef(regfit.fwd, 3)
+coef(regfit.fwd, 4)
+cat('\n')
+paste('Backward Stepwise Regression')
+coef(regfit.bwd, 3)
+coef(regfit.bwd, 4)
+```
+
+We see that for both forward and backward stepwise regression, we also get the same optimal variable outputs of 4, 4, and 3 for AIC, Adj R2, and BIC, respectively. The three variable models for each all select X1, X2, and X3 which reflect the same variables for the true function and each three variable model obviously have the same coefficient values (since they all use OLS) which approximate the true coefficients pretty well.
+
+Where the models depart from one another is for the four variable models, the forward selection and best subset selection chose the same fourth variable, X5, but the backward selection chose 'X9' as its fourth variable.
+
+
+# 10
+
+## (a)
+
+```{r}
+set.seed(1)
+p <- 20
+n <- 1000
+varnames <- c()
+bnames <- c('B0')
+
+X <- c()
+betaT <- c(3)
+
+for (i in 1:p){
+  varnames <- append(varnames, paste0('X',i))
+  
+  X <- cbind(X, rnorm(n, 0, 1/i))
+  
+  if (i %% 2 == 0){
+    bnames <- append(bnames, paste0('X',i))
+    betaT <- cbind(betaT, runif(1,-5,5))
+#    Y <- cbind(Y, X[,i])
+  }
+  else {
+    bnames <- append(bnames, paste0('X',i))
+    betaT <- cbind(betaT, 0)
+  }
+}
+
+colnames(X) <- varnames
+colnames(betaT) <- bnames
+
+X <- cbind(1, X)
+
+Y <- X%*%t(betaT) + rnorm(n, 0, 3)
+
+df <- as.data.frame(cbind(X,Y))
+colnames(df)[22] <- 'Y'
+df <- df[,2:22]
+```
+
+## (b)
+
+```{r}
+set.seed(1)
+
+# Train subset
+train <- sample(1:n, 100)
+```
+
+## (c)
+
+```{r}
+regfit.full <- regsubsets(Y ~ ., data=df[train,], nvmax=20)
+summary(regfit.full)
+```
+
+## (d)
+
+```{r}
+reg.summary <- summary(regfit.full)
+plot(reg.summary$rss/100, type='b',
+     main='Training MSE for Each Model Fit',
+     xlab='Number of VAriables',
+     ylab='Training MSE')
+```
+
+
+## (e)
+
+```{r}
+test.mat <- model.matrix(Y ~ ., data=df[-train,])
+
+val.errors <- rep(NA, 20)
+for (i in 1:20){
+  coefi <- coef(regfit.full, id=i)
+  pred <- test.mat[, names(coefi)] %*% coefi
+  val.errors[i] <- mean((df$Y[-train] - pred)^2)
+}
+val.errors
+```
+
+```{r}
+plot(val.errors,
+     main=paste('Test MSE for Each k-Variable Model \n Best =', which.min(val.errors)),
+     xlab='Number of Variables',
+     ylab='Test MSE')
+abline(v=which.min(val.errors))
+```
+
+## (e)
+
+The model with six variables takes on the lowest test MSE, which differs from the train MSE which gets higher and higher, as we'd expect from the training phase. 
+
+
+## (f)
+
+First we fit the full model on the optimal $k=6$ variables and then take a look at the coefficients.
+
+```{r}
+regfit.fulldata <- regsubsets(Y ~ .,data=df, nvmax=20)
+
+cat('Beta hat values for k=6 variables:\n')
+coef(regfit.fulldata, 6)
+cat('\n')
+cat('True corresponding betas:\n')
+sel <- betaT[1, c(1,3,5,7,9,11,14), drop = TRUE]
+print(sel)
+cat('\n')
+
+cat('Differences between beta hats and true betas:\n')
+coef(regfit.fulldata, 6) - sel
+```
+
+We see that of the six variables selected, the first four match up pretty closely to the true beta values, the fifth is not quite as close but still close, and the sixth is completely off since the sixth true beta is zero. We can see the differences between the two on the third line above.
+
+
+## (g)
+
+```{r}
+beta_true <- as.numeric(betaT[-1])
+names(beta_true) <- colnames(betaT)[-1]
+beta_diff_norm <- numeric(20)
+for(r in 1:20) {
+  coef_r <- coef(regfit.fulldata, id = r)
+  coef_r <- coef_r[names(coef_r) != "(Intercept)"]
+
+  beta_hat <- setNames(numeric(length(beta_true)), names(beta_true))
+  beta_hat[names(coef_r)] <- coef_r
+
+  beta_diff_norm[r] <- sqrt(sum((beta_true - beta_hat)^2))
+}
+
+plot(seq_len(p), beta_diff_norm,
+     type = "b",
+     xlab = "Number of Variables",
+     ylab = 'Sqrt RSS for Beta and Betahat',
+     main = "Sqrt RSS for Beta and Betahat vs Number of Variables")
+```
+
+Using the equation $\sqrt{\sum_{j=1}^p (\beta_j - \hat{\beta}_j^r)^2}$, we see that this norm value for each subset of variables has a minimum at the model with five variables, but is still quite low with the model with six variables. Overall, this plot looks pretty similar to our test MSE plot, further validating our choice for the optimal model being the six variable model.
+
