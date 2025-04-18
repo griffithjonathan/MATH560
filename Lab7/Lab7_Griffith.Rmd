@@ -1,0 +1,114 @@
+---
+title: "RLab 7"
+author: "Jon Griffith"
+date: "2025-04-24"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ISLR2)
+```
+
+For this lab, we focus on Wage data contained in ISLR2 package.
+
+```{r}
+head(Wage)
+```
+
+# 7.8.1
+
+We first fit a degree four polynomial using a few different methods. The first method uses the basis of the orthogonal polynomials while the other three use the raw data. They all produce similar results with just differing coefficient values.
+
+Basis fit:
+
+```{r}
+fit <- lm(wage ~ poly(age,4), data=Wage)
+coef(summary(fit))
+```
+
+Raw fits with identical results:
+
+```{r}
+fit2 <- lm(wage ~ poly(age, 4, raw=T), data=Wage)
+
+coef(summary(fit2))
+```
+
+```{r}
+fit2a <- lm(wage ~ age + I(age^2) + I(age^3) + I(age^4), data = Wage)
+coef(fit2a)
+```
+
+```{r}
+fit2b <- lm(wage ~ cbind(age, age^2, age^3, age^4), data=Wage)
+coef(fit2b)
+```
+
+Now we move on to making predictions with our original model, along with corresponding standard errors.
+
+```{r}
+agelims <- range(Wage$age)
+age.grid <- seq(from=agelims[1], to=agelims[2])
+preds <- predict(fit, newdata=list(age=age.grid), se=TRUE)
+
+# Calculate the 95% confidence interval for predictions
+se.bands <- cbind(preds$fit + 2*preds$se.fit, preds$fit - 2*preds$se.fit)
+```
+
+Finally, we plot the data and add our degree four polynomial fit.
+
+```{r}
+par(mfrow=c(1,2), mar = c(4.5, 4.5, 1, 1),
+    oma = c(0, 0, 4, 0))
+
+plot(Wage$age, Wage$wage, xlim=agelims, cex=0.5, col = 'darkgrey')
+title('Degree-4 Polynomial', outer=T)
+lines(age.grid, preds$fit, lwd=2, col='blue')
+matlines(age.grid, se.bands, lwd=1, col='blue', lty=3)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
