@@ -1,0 +1,352 @@
+---
+title: "HW6"
+author: "Jon Griffith and Annabelle Cunningham"
+date: "2025-04-21"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ISLR2)
+library(glmnet)
+library(leaps)
+library(pls)
+```
+
+# 8
+
+## (e)
+
+```{r}
+set.seed(1)
+# Generate data
+x <- rnorm(100)
+e <- rnorm(100)
+Y <- 4 - 3*x - 2*x^2 + 1.25*x^3 + e
+
+df <- data.frame(x,Y)
+```
+
+```{r}
+set.seed(1)
+cv.out <- cv.glmnet(poly(df$x,10,raw=TRUE), df$Y, alpha=1)
+
+plot(cv.out)
+
+lasso.mod <- glmnet(poly(df$x, 10, raw=TRUE), df$Y, alpha=1, lambda=cv.out$lambda.min)
+predict(lasso.mod, type='coefficients', s=cv.out$lambda.min)
+```
+
+\textcolor{blue}{Our resulting coefficient predictions based on the optimal lambda from CV come close to the true values for $\beta_0$, $\beta_1$, and $\beta_2$, while $\beta_3$ is about half of its actual value and $\beta_5$ is included even though there was no $X^5$ in the true equation. It still did a pretty good job of selecting close to the actual number of variables in the model and was only off by one.}
+
+
+## (f)
+
+```{r}
+set.seed(1)
+df$Y <- 4 - 1.25*x^7 + e
+
+bestsub.mod <- regsubsets(Y ~ poly(x, 10, raw=TRUE), data=df)
+
+reg.summary <- summary(bestsub.mod)
+
+par(mfrow=c(2,2))
+# PLot of cp vs num variables
+plot(reg.summary$cp,
+  xlab='Number of Variables',
+  ylab='Cp',
+  type='l',
+  main=paste('Optimal:', which.min(reg.summary$cp)))
+abline(v=which.min(reg.summary$cp))
+# PLot of adjr2 vs num variables
+plot(reg.summary$adjr2,
+  xlab='Number of Variables',
+  ylab='Adj R2',
+  type='l',
+  main=paste('Optimal:', which.max(reg.summary$adjr2)))
+abline(v=which.max(reg.summary$adjr2))
+# PLot of bic vs num variables
+plot(reg.summary$bic,
+  xlab='Number of Variables',
+  ylab='BIC',
+  type='l',
+  main=paste('Optimal:', which.min(reg.summary$bic)))
+abline(v=which.min(reg.summary$bic))
+```
+
+```{r}
+coef(bestsub.mod, 1)
+coef(bestsub.mod, 2)
+coef(bestsub.mod, 4)
+```
+
+```{r}
+coef(bestsub.mod, 1)
+coef(bestsub.mod, 2)
+coef(bestsub.mod, 4)
+```
+
+\textcolor{blue}{The best models as measured by BIC, CP, and Adj $R^2$ determined best subsets of ($X^7$), ($X^2$, $X^7$), and ($X$, $X^2$, $X^3$, and $X^7$), respectively. Each model included the predictor $X^7$ that corresponded to the true predictor, and the intercepts and coefficient for $X^7$ very closely approximated the true values for each. BIC did the best job but CP and Adj $R^2$ were nearly as good, adding only negligible effects of extra predictors.}
+
+```{r}
+set.seed(1)
+cv.out <- cv.glmnet(poly(df$x,10,raw=TRUE), df$Y, alpha=1)
+
+plot(cv.out)
+
+lasso.mod <- glmnet(poly(df$x, 10, raw=TRUE), df$Y, alpha=1, lambda=cv.out$lambda.min)
+predict(lasso.mod, type='coefficients', s=cv.out$lambda.min)
+```
+
+\textcolor{blue}{The optimal lambda and corresponding model for Lasso, per CV, includes an intercept value of 3.81 which very closely approximates the true intercept of 4, the $X^5$ predictor with a coefficient of $-0.018$, which is not in the true model but is negligible, and the $X^7$ predictor with a coefficient of $-1.212$, which very closely approximates the true coefficient of $-1.25$. The Lasso does a good job of replicating the true model and is about on par with the best subsets method.}
+
+
+# 9
+
+## (a)
+
+```{r}
+df <- College
+head(df)
+```
+
+```{r}
+set.seed(1)
+train <- sample(1:nrow(df), round(0.7*nrow(df)))
+```
+
+## (b)
+
+```{r}
+ols.mod <- lm(Apps ~ ., data=df[train,])
+yhat <- predict(ols.mod, newdata = df[-train,])
+MSE <- mean((yhat - df$Apps[-train])^2)
+MSE
+```
+
+## (c)
+
+```{r}
+set.seed(1)
+train_split <- model.matrix(Apps ~ .-1, data=df[train,])
+test_split <- model.matrix(Apps ~ .-1, data=df[-train,])
+ridge.cv <- cv.glmnet(train_split, df$Apps[train], alpha=0)
+yhat <- predict(ridge.cv, newx = test_split, s = ridge.cv$lambda.min)
+MSE_ridge <- mean((yhat - df$Apps[-train])^2)
+MSE_ridge
+
+ridge.coef <- predict(ridge.cv, type='coefficients', s=ridge.cv$lambda.min)[1:19,]
+ridge.coef
+```
+
+## (d)
+
+```{r}
+set.seed(1)
+lasso.cv <- cv.glmnet(train_split, df$Apps[train], alpha=1)
+yhat <- predict(lasso.cv, newx = test_split, s = lasso.cv$lambda.min)
+MSE_lasso <- mean((yhat - df$Apps[-train])^2)
+lasso.coef <- predict(lasso.cv, type='coefficients', s=lasso.cv$lambda.min)[1:19,]
+
+MSE_lasso
+lasso.coef
+```
+
+\textcolor{blue}{We have only one predictor zeroed out and several others that are close to zero.}
+
+
+## (e)
+
+### PCR
+
+```{r}
+set.seed(1)
+pcr.mod <- pcr(Apps ~ ., data=df[train,], scale=TRUE, validation='CV')
+validationplot(pcr.mod, val.type='MSEP')
+
+which.min(pcr.mod$validation$PRESS)
+```
+
+\textcolor{blue}{We have a minimum at the model with the same number of components as predictors, so we have $M=17=p$. This is equivalent to the OLS model, and so we will use this to find our test error equivalent to OLS.}
+
+```{r}
+M <- 17
+yhat <- predict(pcr.mod, df[-train,], ncomp = M)
+MSE_pcr <- mean((yhat - df$Apps[-train])^2)
+
+MSE_pcr
+```
+
+## (f)
+
+### PLS
+
+```{r}
+set.seed(1)
+pls.mod <- plsr(Apps ~ ., data=df[train,], scale=TRUE, validation='CV')
+validationplot(pls.mod, val.type='MSEP')
+which.min(pls.mod$validation$PRESS)
+```
+
+\textcolor{blue}{We again have a minimum at $M=17$, which is equivalent to the OLS model, and so we will use this to find our test error equivalent to OLS.}
+
+```{r}
+M <- 17
+yhat <- predict(pls.mod, df[-train,], ncomp = M)
+MSE_pls <- mean((yhat - df$Apps[-train])^2)
+
+MSE_pls
+```
+
+## (f)
+
+```{r}
+cat('MSE OLS: ', MSE, '\n')
+cat('MSE Ridge: ', MSE_ridge, '\n')
+cat('MSE Lasso: ', MSE_lasso, '\n')
+cat('MSE PCR: ', MSE_pcr, '\n')
+cat('MSE PLS: ', MSE_pls, '\n')
+```
+
+\textcolor{blue}{We achieved our best results from Ridge and Lasso while PCR and PLS just gave the OLS estimate. Out of Ridge and Lasso, Ridge did better.}
+
+
+# 11
+
+## (a)
+
+### Create train/test splits
+
+```{r}
+df <- Boston
+
+set.seed(1)
+train <- sample(1:nrow(df), round(0.7*nrow(df)))
+
+train_split <- model.matrix(crim ~ .-1, data=df[train,])
+test_split <- model.matrix(crim ~ .-1, data=df[-train,])
+```
+
+### Best Subset Selection
+
+```{r}
+bestsub.mod <- regsubsets(crim ~ ., data=df[train,], nvmax=12)
+
+reg.summary <- summary(bestsub.mod)
+
+par(mfrow=c(2,2))
+# PLot of cp vs num variables
+plot(reg.summary$cp,
+  xlab='Number of Variables',
+  ylab='Cp',
+  type='l',
+  main=paste('Optimal:', which.min(reg.summary$cp)))
+abline(v=which.min(reg.summary$cp))
+# PLot of adjr2 vs num variables
+plot(reg.summary$adjr2,
+  xlab='Number of Variables',
+  ylab='Adj R2',
+  type='l',
+  main=paste('Optimal:', which.max(reg.summary$adjr2)))
+abline(v=which.max(reg.summary$adjr2))
+# PLot of bic vs num variables
+plot(reg.summary$bic,
+  xlab='Number of Variables',
+  ylab='BIC',
+  type='l',
+  main=paste('Optimal:', which.min(reg.summary$bic)))
+abline(v=which.min(reg.summary$bic))
+```
+
+```{r}
+test.mat <- model.matrix(crim ~ ., data=df[-train,])
+val.errors <- rep(NA, 12)
+for (i in 1:12){
+  coefi <- coef(bestsub.mod, id=i)
+  pred <- test.mat[,names(coefi)] %*% coefi
+  val.errors[i] <- mean((df$crim[-train] - pred)^2)
+}
+plot(val.errors,
+  main='MSE for each model fit\n Optimal: 7',
+  xlab='Number of Variables',
+  ylab='MSE')
+abline(v = which.min(val.errors))
+```
+
+```{r}
+MSE_bestsub <- val.errors[2]
+MSE_bestsub
+```
+
+### Ridge Regression
+
+```{r}
+ridge.cv <- cv.glmnet(train_split, df$crim[train], alpha=0)
+yhat <- predict(ridge.cv, newx = test_split, s = ridge.cv$lambda.min)
+MSE_ridge <- mean((yhat - df$crim[-train])^2)
+MSE_ridge
+```
+
+### Lasso
+
+```{r}
+lasso.cv <- cv.glmnet(train_split, df$crim[train], alpha=1)
+yhat <- predict(lasso.cv, newx = test_split, s = lasso.cv$lambda.min)
+MSE_lasso <- mean((yhat - df$crim[-train])^2)
+MSE_lasso
+```
+
+### PCR
+
+```{r}
+set.seed(1)
+pcr.mod <- pcr(crim ~ ., data=df[train,], scale=TRUE, validation='CV')
+validationplot(pcr.mod, val.type='MSEP')
+
+which.min(pcr.mod$validation$PRESS)
+```
+
+```{r}
+M <- 12
+yhat <- predict(pcr.mod, df[-train,], ncomp = M)
+MSE_pcr <- mean((yhat - df$crim[-train])^2)
+
+MSE_pcr
+```
+
+### PLS
+
+```{r}
+set.seed(1)
+pls.mod <- plsr(crim ~ ., data=df[train,], scale=TRUE, validation='CV')
+validationplot(pls.mod, val.type='MSEP')
+which.min(pls.mod$validation$PRESS)
+```
+
+```{r}
+M <- 10
+yhat <- predict(pls.mod, df[-train,], ncomp = M)
+MSE_pls <- mean((yhat - df$crim[-train])^2)
+
+MSE_pls
+```
+
+## (b)
+
+```{r}
+cat('MSE Best Subset: ', MSE_bestsub, '\n')
+cat('MSE Ridge: ', MSE_ridge, '\n')
+cat('MSE Lasso: ', MSE_lasso, '\n')
+cat('MSE PCR: ', MSE_pcr, '\n')
+cat('MSE PLS: ', MSE_pls, '\n')
+```
+
+\textcolor{blue}{We see that PCR and PLS perform the best out of best subset, ridge, lasso, PCR, and PLS, while PLS performs very slightly better than PCR. This is interesting because PCR is just OLS regression in this case since since the number of transformed predictors equals the number of original predictors ($M=p$). So we could just use the standard OLS model or use PLS with ten variables if we want a very slight improvement. Because PLS is less interpretable than OLS, we'd probably want to favor using OLS.}
+
+
+## (c)
+
+\textcolor{blue}{We chose PCR(OLS) as our final model. It includes all of the features in the dataset because that is how PCR works in general, it uses linear combinations of every feature for each transformed predictor. In this case, the PCR model is just the OLS model since $M=p$.}
