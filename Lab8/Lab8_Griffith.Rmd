@@ -1,0 +1,146 @@
+---
+title: "RLab 8"
+author: "Jon Griffith"
+date: "2025-05-01"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ISLR2)
+library(fields)
+library(splines)
+library(gam)
+library(akima)
+```
+
+# 7.8.3 GAMs
+
+We begin by using the same dataset, 'Wages', as we did in the last lab. We first fit a GAM to predict wage using natural spline functions of year and age, and we'll treat education as a qualitative predictor. We first fit the model using the lm() function and the ns() function inside to fit the natural splines.
+
+```{r}
+gam1 <- lm(wage ~ ns(year, 4) + ns(age, 5) + education, data=Wage)
+```
+
+Now we'll fit a GAM using smoothing splines, but this time using the gam() function from the gam library. We specify that age will have 5 DF, year will have 4 DF, and we leave education as is since it is qualitative. We then reproduce Figure 7.12.
+
+```{r}
+gam.m3 <- gam(wage ~ s(year, 4) + s(age, 5) + education, data=Wage)
+
+par(mfrow = c(1,3))
+plot(gam.m3, se = TRUE, col='blue')
+```
+
+And we'll plot our first GAM model to reproduce Figure 7.11 using plot.Gam().
+
+```{r}
+par(mfrow=c(1,3))
+plot.Gam(gam1, se = TRUE, col='red')
+```
+
+We can see from above that in both models, year appears to be linear. We'll conduct ANOVA tests to determine which model is best from one that excludes year, one that uses a linear function of year, or one that uses a spline function of year.
+
+```{r}
+gam.m1 <- gam(wage ~ s(age, 5) + education, data=Wage)
+gam.m2 <- gam(wage ~ year + s(age, 5) + education, data=Wage)
+
+anova(gam.m1, gam.m2, gam.m3, test = 'F')
+```
+
+Based on the results above, we can see that the optimal model out of these three is the model that uses a linear function of year. Lets look at the summary for our third model that uses splines for year and notice that we can see the p-value for the parametric and nonparametric effects of each variable. For age, we see that the nonlinear version is statistically significant, confirming our visual belief from the plots. We also see that year is not significant for this panel and therefore, the linear transformation is valid based on the results in the parametric effects table.
+
+```{r}
+summary(gam.m3)
+```
+
+We'll make predictions using our second model.
+
+```{r}
+preds <- predict(gam.m2, newdata=Wage)
+```
+
+Now we'll create a new GAM that uses local regression fits as the building blocks. This is done using the lo() function where we can fit age and specify the span.
+
+```{r}
+par(mfrow=c(1,3))
+gam.lo <- gam(wage ~ s(year, df=4) + lo(age, span=0.7) + education, data=Wage)
+plot(gam.lo, se=TRUE, col='green')
+```
+
+The lo() function can also be used to create interactions before calling gam(). We use a local regression surface between year and age and visualize that in the plot below.
+
+```{r, warning=FALSE}
+gam.lo.i <- gam(wage ~ lo(year, age, span=0.5) + education, data=Wage)
+
+par(mfrow=c(1,2))
+plot(gam.lo.i)
+```
+
+Now we'll fit a logistic regression GAM using the I() function.
+
+```{r}
+gam.lr <- gam(
+  I(wage > 250) ~ year + s(age, df=5) + education, family = binomial, data=Wage
+)
+
+par(mfrow=c(1,3))
+plot(gam.lr, se=T, col='green')
+```
+
+We can see that there aren't any high earners in the <HS category.
+
+```{r}
+table(Wage$education, I(Wage$wage > 250))
+```
+
+Since we can see that there are indeed 0, we will refit the model without this category.
+
+```{r}
+gam.lr.s <- gam(
+  I(wage > 250) ~ year + s(age, df=5) + education,
+  family=binomial, data=Wage,
+  subset=(education != "1. < HS Grad")
+)
+
+par(mfrow=c(1,3))
+plot(gam.lr.s, se=T, col='green')
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

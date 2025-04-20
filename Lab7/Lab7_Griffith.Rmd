@@ -11,6 +11,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 library(ISLR2)
+library(fields)
+library(splines)
 ```
 
 For this lab, we focus on Wage data contained in ISLR2 package.
@@ -19,7 +21,7 @@ For this lab, we focus on Wage data contained in ISLR2 package.
 head(Wage)
 ```
 
-# 7.8.1
+# 7.8.1 Polynomial Regression and Step Functions
 
 We first fit a degree four polynomial using a few different methods. The first method uses the basis of the orthogonal polynomials while the other three use the raw data. They all produce similar results with just differing coefficient values.
 
@@ -71,37 +73,161 @@ lines(age.grid, preds$fit, lwd=2, col='blue')
 matlines(age.grid, se.bands, lwd=1, col='blue', lty=3)
 ```
 
+Notice that the fitted values obtained from any of these models are identical.
+
+```{r}
+preds2 <- predict(fit2, newdata=list(age=age.grid),
+                  se=TRUE)
+test.for.zero(preds$fit, preds2$fit)
+```
+
+We'll now fit models ranging from degree 1 to degree 5 polynomials and look to select the simplest model. We'll test these models using the anova() function to perform analysis of variance between our models of interest. We see that the degree 3 and degree 4 both offer evidence of being good fits, but only those two.
+
+```{r}
+fit.1 <- lm(wage ~ age, data=Wage)
+fit.2 <- lm(wage ~ poly(age, 2), data=Wage)
+fit.3 <- lm(wage ~ poly(age, 3), data=Wage)
+fit.4 <- lm(wage ~ poly(age, 4), data=Wage)
+fit.5 <- lm(wage ~ poly(age, 5), data=Wage)
+anova(fit.1, fit.2, fit.3, fit.4, fit.5)
+```
+
+Now we'll exploit the fact that the poly() function creates orthogonal polynomials and therefore can give the same results as our anova() function.The p-values are the same and the square of the t-statistics equal the F-statistics from anova().
+
+```{r}
+coef(summary(fit.5))
+```
+
+ANOVA works whether or not the polynomials are orthogonal and should be used when there are other terms in the model as well. We'll demonstrate by comparing three models below. We can also select the degree polynomial we think is optimal using cross-validation.
+
+```{r}
+fit.1 <- lm(wage ~ education + age, data=Wage)
+fit.2 <- lm(wage ~ education + poly(age, 2), data=Wage)
+fit.3 <- lm(wage ~ education + poly(age, 3), data=Wage)
+anova(fit.1, fit.2, fit.3)
+```
+
+We'll now fit a polynomial logistic regression model and predict whether an individual earns more than 250k per year. We create a mask for the 250k wage threshold and glm() will coerce this response vector to a binary vector. The predictions for a logistic regression model are given in terms of logit and so we need to transform these logits into probabilities using the sigmoid function. We need to use this transformation instead of the 'type="response"' option in the predict() function because the logits need to be transformed together for the fit and the standard error.
+
+```{r}
+fit <- glm(I(wage > 250) ~ poly(age, 4), data=Wage, family=binomial)
+
+preds <- predict(fit, newdata=list(age=age.grid), se=TRUE)
+pfit <- exp(preds$fit) / (1+exp(preds$fit))
+se.bands.logit <- cbind(preds$fit - 2*preds$se.fit, preds$fit + 2*preds$se.fit)
+se.bands <- exp(se.bands.logit) / (1 + exp(se.bands.logit))
+
+se.bands[1:5,]
+```
+
+Now we replicate the right-hand plot from Figure 7.1 in the text. Notice the ticks on the top correspond to ages with wage above 250k and the ticks on the bottom correspond to ages below 250k to give us a visual of the split. This is known as a 'rug plot'.
+
+```{r}
+plot(Wage$age, I(Wage$wage > 250), xlim = agelims, type='n', ylim=c(0, 0.2))
+points(jitter(Wage$age), I((Wage$wage>250) / 5), cex=0.5, pch='l', col='darkgrey')
+lines(age.grid, pfit, lwd=2, col='blue')
+matlines(age.grid, se.bands, lwd=1, col='blue', lty=3)
+```
+
+Next, we fit a step function using the cut() function to return an ordered categorical variable. We get four intervals ranging from the lowest to highest age.
+
+```{r}
+table(cut(Wage$age,4))
+cat('\n')
+fit <- lm(wage ~ cut(age, 4), data=Wage)
+coef(summary(fit))
+```
+
+Now we can replicate the Figure 7.2 in the book using our step function fit.
+
+```{r}
+preds <- predict(fit, newdata=list(age=age.grid), se=TRUE)
+
+# Calculate the 95% confidence interval for predictions
+se.bands <- cbind(preds$fit + 2*preds$se.fit, preds$fit - 2*preds$se.fit)
+```
+
+```{r}
+par(mfrow=c(1,2), mar = c(4.5, 4.5, 1, 1),
+    oma = c(0, 0, 4, 0))
+
+plot(Wage$age, Wage$wage, xlim=agelims, cex=0.5, col = 'darkgrey')
+title('Piecewise Constant', outer=T)
+lines(age.grid, preds$fit, lwd=2, col='blue')
+matlines(age.grid, se.bands, lwd=1, col='blue', lty=3)
 
 
+fit <- glm(I(wage > 250) ~ cut(age, 4), data=Wage, family=binomial)
 
+preds <- predict(fit, newdata=list(age=age.grid), se=TRUE)
+pfit <- exp(preds$fit) / (1+exp(preds$fit))
+se.bands.logit <- cbind(preds$fit - 2*preds$se.fit, preds$fit + 2*preds$se.fit)
+se.bands <- exp(se.bands.logit) / (1 + exp(se.bands.logit))
 
+plot(Wage$age, I(Wage$wage > 250), xlim = agelims, type='n', ylim=c(0, 0.2))
+points(jitter(Wage$age), I((Wage$wage>250) / 5), cex=0.5, pch='l', col='darkgrey')
+lines(age.grid, pfit, lwd=2, col='blue')
+matlines(age.grid, se.bands, lwd=1, col='blue', lty=3)
+```
 
+# 7.8.2 Splines
 
+Now we move onto splines and use the 'splines' library to fit our models. We first fit wage to age using a regression spline and use the bs() function to generate a matrix of basis functions with specified knots. We'll use three knots to produce a spline with six basis functions.
 
+```{r}
+fit <- lm(wage ~ bs(age, knots = c(25, 40, 60)), data=Wage)
+pred <- predict(fit, newdata = list(age = age.grid), se=TRUE)
+plot(Wage$age, Wage$wage, col='gray')
+lines(age.grid, pred$fit, lwd=2)
+lines(age.grid, pred$fit + 2*pred$se, lty='dashed')
+lines(age.grid, pred$fit - 2*pred$se, lty='dashed')
+```
 
+We verify below that we have six basis functions and also show how we can use the df argument to produce three knots at uniform quantiles of the data.
 
+```{r}
+dim(bs(Wage$age, knots = c(25, 40, 60)))
+dim(bs(Wage$age, df=6))
+attr(bs(Wage$age, df=6), 'knots')
+```
 
+Now we'll fit a natural spline that has four degrees of freedom using the ns() function.
 
+```{r}
+fit2 <- lm(wage ~ ns(age, df=4), data=Wage)
+pred2 <- predict(fit2, newdata=list(age=age.grid), se=TRUE)
 
+plot(Wage$age, Wage$wage, xlim=agelims, cex=0.5, col='darkgrey')
+lines(age.grid, pred2$fit, col = 'red', lwd=2)
+```
 
+Now we'll fit a smoothing spline using the smooth.spline() function and produce the Figure 7.8 from the text. The first spline we specify 16 DF and a lambda is determined that meets that number while the second uses cross-validation to find a lambda that produces 6.8 DF.
 
+```{r, warning=FALSE}
+fit <- smooth.spline(Wage$age, Wage$wage, df=16)
+fit2 <- smooth.spline(Wage$age, Wage$wage, cv=TRUE)
 
+plot(Wage$age, Wage$wage, xlim=agelims, cex=0.5, col='darkgrey')
+title('Smoothing Spline')
+lines(fit, col = 'red', lwd=2)
+lines(fit2, col='blue', lwd=2)
+legend('topright', legend = c('16 DF', '6.8 DF'), col = c('red', 'blue'),
+       lty=1, lwd=2, cex=0.8)
+```
 
+Finally, we'll fit a local regression using the loess() function. We'll specify spans of 0.2 and 0.5 for two different fits that will make each neighborhood consist of 20 percent and 50 percent of the observations, respectively. As we'll see, the larger we make this span the smoother the fit will be.
 
+```{r}
+fit <- loess(wage ~ age, span=0.2, data=Wage)
+fit2 <- loess(wage ~ age, span=0.5, data=Wage)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+plot(Wage$age, Wage$wage, xlim=agelims, cex=0.5, col='darkgrey')
+title('Local Regression')
+lines(age.grid, predict(fit, data.frame(age=age.grid)), col='red', lwd=2)
+lines(age.grid, predict(fit2, data.frame(age=age.grid)), col='blue', lwd=2)
+legend('topright', legend=c('Span = 0.2', 'Span = 0.5'), col = c('red', 'blue'),
+       lty=1, lwd=2, cex=0.8)
+```
 
 
 
