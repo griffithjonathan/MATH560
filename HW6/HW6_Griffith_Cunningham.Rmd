@@ -77,11 +77,6 @@ plot(reg.summary$bic,
 abline(v=which.min(reg.summary$bic))
 ```
 
-```{r}
-coef(bestsub.mod, 1)
-coef(bestsub.mod, 2)
-coef(bestsub.mod, 4)
-```
 
 ```{r}
 coef(bestsub.mod, 1)

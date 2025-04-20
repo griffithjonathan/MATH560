@@ -1,0 +1,390 @@
+---
+title: "HW6"
+output: pdf_document
+date: "2025-04-19"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Homework 6
+
+## Question 2
+### Part A
+Because Best Subset considers all possible combinations of predictors for a model, it will have the lowest training RSS.
+
+### Part B
+Forward or Backward Subset selection will have lower test RSS values than Best Subset because Best Subset has a tendency to overfit due to its small training RSS.
+
+### Part C
+i. True - Forward Stepwise models build sequentially, adding one predictor at a time. So the model with k+1 predictors always includes all the predictors in the model with k predictors, plus one more.
+ii. True - Backwards Stepwise models build sequentially, removing one predictor at a time. So the model with k predictors is always a subset of a model with k+1 predictors.
+iii. False - Forward and Backward Stepwise selection follow different paths and will likely come to different conclusions on the best predictors to use.
+iv. False - Forward and Backward Stepwise selection follow different paths and will likely come to different conclusions on the best predictors to use.
+v. False - Best Subset selection is not built sequentially, therefore a model with k+1 predictors isn't guaranteed to contain all the predictors from a k predictor model. The predictors from a smaller model aren't transferred to a larger model. 
+
+## Question 3
+### Part A
+
+### Part B
+
+### Part C
+
+### Part D
+
+### Part E
+
+## Question 4
+### Part A
+
+### Part B
+
+### Part C
+
+### Part D
+
+### Part E
+
+## Question 8
+```{r}
+set.seed(123)
+n <- 100
+X <- rnorm(n)
+epsilon <- rnorm(n)
+# Coefficients
+beta_0 <- 2
+beta_1 <- 3
+beta_2 <- -1.5
+beta_3 <- 0.5
+
+# Generate response variable Y
+Y <- beta_0 + beta_1 * X + beta_2 * X^2 + beta_3 * X^3 + epsilon
+```
+
+### Part E
+```{r}
+library(glmnet)
+# Create design matrix with X, X^2, ..., X^10
+X_poly <- poly(X, 10, raw = TRUE)  # raw = TRUE gives actual powers of X
+X_matrix <- as.matrix(X_poly)
+
+# Fit Lasso with cross-validation
+cv_lasso <- cv.glmnet(X_matrix, Y, alpha = 1)  # alpha = 1 → Lasso
+
+# Plot cross-validation error vs lambda
+plot(cv_lasso)
+title("Cross-Validation Error for Lasso", line = 2.5)
+
+# Get optimal lambda
+lambda_opt <- cv_lasso$lambda.min
+cat("Optimal lambda:", lambda_opt, "\n")
+
+# Fit final model with optimal lambda
+lasso_model <- glmnet(X_matrix, Y, alpha = 1, lambda = lambda_opt)
+
+# Coefficients
+coef(lasso_model)
+```
+Since the true model only contains X, X^2, and X^3, the higher power X coefficients converged to zero.
+
+### Part F
+```{r}
+# Load required libraries
+library(leaps)     # for best subset selection
+library(glmnet)    # for lasso
+
+# Sample size
+n <- 100
+
+# True model: only X^7 matters
+beta_7 <- 5
+Y <- beta_0 + beta_7 * X^7 + epsilon
+
+# Create a data frame with X, X^2, ..., X^10
+X_poly_df <- data.frame(sapply(1:10, function(i) X^i))
+colnames(X_poly_df) <- paste0("X", 1:10)
+
+# Add response Y
+data <- cbind(Y, X_poly_df)
+
+# Best Subset Selection
+
+best_subset <- regsubsets(Y ~ ., data = data, nvmax = 10)
+best_summary <- summary(best_subset)
+
+# Plot RSS and Cp
+par(mfrow = c(1, 2))
+plot(best_summary$rss, xlab = "Number of Predictors", ylab = "RSS", type = "b")
+plot(best_summary$cp, xlab = "Number of Predictors", ylab = "Cp", type = "b")
+
+# Find model with lowest Cp
+which.min(best_summary$cp)
+
+
+
+
+```
+```{r}
+# Lasso
+X_matrix <- as.matrix(X_poly_df)
+
+cv_lasso <- cv.glmnet(X_matrix, Y, alpha = 1)
+plot(cv_lasso)
+title("Lasso Cross-Validation", line = 2.5)
+
+lambda_opt <- cv_lasso$lambda.min
+lasso_model <- glmnet(X_matrix, Y, alpha = 1, lambda = lambda_opt)
+
+# Coefficients
+coef(lasso_model)
+```
+Both models agree that X^7 has the most relevant coefficient. Best selection chooses only the coefficient for X^7 to include, but Lasso argues that the intercept coefficient should also be included at a very small value.
+
+## Question 9
+### Part A
+```{r}
+library(ISLR)
+data(College)
+train_idx <- sample(1:nrow(College), size = 0.7 * nrow(College))
+
+train <- College[train_idx, ]
+test <- College[-train_idx, ]
+```
+
+### Part B
+```{r}
+lm_fit <- lm(Apps ~ ., data = train)
+lm_pred <- predict(lm_fit, newdata = test)
+
+# test MSE
+lm_mse <- mean((test$Apps - lm_pred)^2)
+cat("Test MSE for Linear Model:", round(lm_mse, 2), "\n")
+```
+
+### Part C
+```{r}
+x_train <- model.matrix(Apps ~ ., data = train)[, -1]  
+y_train <- train$Apps
+
+x_test <- model.matrix(Apps ~ ., data = test)[, -1]
+y_test <- test$Apps
+
+# Fit Ridge regression with cross-validation (alpha = 0 for Ridge)
+set.seed(1)
+cv_ridge <- cv.glmnet(x_train, y_train, alpha = 0)
+
+# Best lambda
+best_lambda_ridge <- cv_ridge$lambda.min
+ridge_pred <- predict(cv_ridge, s = best_lambda_ridge, newx = x_test)
+
+# test MSE
+ridge_mse <- mean((y_test - ridge_pred)^2)
+cat("Test MSE for Ridge Regression:", round(ridge_mse, 2), "\n")
+
+```
+
+### Part D
+```{r}
+cv_lasso <- cv.glmnet(x_train, y_train, alpha = 1)
+
+# Best lambda
+best_lambda_lasso <- cv_lasso$lambda.min
+
+# Predict on test set using best lambda
+lasso_pred <- predict(cv_lasso, s = best_lambda_lasso, newx = x_test)
+
+# test MSE
+lasso_mse <- mean((y_test - lasso_pred)^2)
+
+# Get the number of non-zero coefficients
+lasso_non_zero_coefs <- sum(coef(cv_lasso, s = best_lambda_lasso) != 0) - 1  # subtract 1 for the intercept
+
+# Report results
+cat("Test MSE for Lasso Regression:", round(lasso_mse, 2), "\n")
+cat("Number of non-zero coefficients:", lasso_non_zero_coefs, "\n")
+```
+
+### Part E
+```{r}
+# Load pls package if not already loaded
+library(pls)
+
+# Fit PCR model with cross-validation (using 10-fold cross-validation)
+set.seed(1)
+pcr_fit <- pcr(Apps ~ ., data = train, scale = TRUE, validation = "CV")
+
+# Check the number of components used by the model
+max_components <- pcr_fit$ncomp
+
+# Get RMSEP (Root Mean Squared Error of Prediction) for cross-validation
+cv_rmse <- RMSEP(pcr_fit)
+
+# Find the optimal number of components (M) based on the minimum RMSEP
+optimal_M <- which.min(cv_rmse$val)  # Minimum RMSE from CV results
+
+# Ensure optimal_M is within the bounds of available components
+optimal_M <- min(optimal_M, max_components)
+
+# Predict on the test set using the optimal number of components (M)
+pcr_pred <- predict(pcr_fit, ncomp = optimal_M, newdata = test)
+
+# Compute the test MSE
+pcr_mse <- mean((test$Apps - pcr_pred)^2)
+
+# Report the test MSE and the optimal number of components
+cat("Test MSE for PCR:", round(pcr_mse, 2), "\n")
+cat("Optimal M (number of components):", optimal_M, "\n")
+
+```
+
+### Part F
+```{r}
+
+# Fit PLS model with cross-validation (using 10-fold cross-validation)
+pls_fit <- plsr(Apps ~ ., data = train, scale = TRUE, validation = "CV")
+
+# Get RMSEP for cross-validation
+cv_rmse <- RMSEP(pls_fit)
+
+# number of components available in the model
+max_components <- pls_fit$ncomp
+
+# Find the optimal number of components (M) based on the minimum RMSEP
+optimal_M <- which.min(cv_rmse$val)  # Minimum RMSE from CV results
+optimal_M <- min(optimal_M, max_components)
+
+# optimal number of components (M)
+pls_pred <- predict(pls_fit, newdata = test, ncomp = optimal_M)
+
+# test MSE
+pls_mse <- mean((test$Apps - pls_pred)^2)
+
+# test MSE and the optimal number of components
+cat("Test MSE for PLS:", round(pls_mse, 2), "\n")
+cat("Optimal M (number of components):", optimal_M, "\n")
+
+
+```
+
+### Part G
+Two out of three models advocate for 17 components, while only one says 14 are necessary. The MSE values range from 743075.3 to 810272.6, while most models agree that the test MSE is around 850759.
+
+## Question 11
+### Part A
+```{r}
+library(MASS)
+data(Boston)
+```
+Best Subset Selection
+```{r}
+# Perform best subset selection
+best_sub <- regsubsets(crim ~ ., data = Boston, nvmax = 13)  # 13 predictors
+
+# Get summary
+best_sub_summary <- summary(best_sub)
+
+# Plot RSS, Adjusted R², Cp, and BIC
+par(mfrow = c(2, 2))
+plot(best_sub_summary$rss, type = "b", xlab = "Number of Variables", ylab = "RSS")
+plot(best_sub_summary$adjr2, type = "b", xlab = "Number of Variables", ylab = "Adjusted R²")
+plot(best_sub_summary$cp, type = "b", xlab = "Number of Variables", ylab = "Cp")
+plot(best_sub_summary$bic, type = "b", xlab = "Number of Variables", ylab = "BIC")
+
+# Optimal number of variables according to BIC
+which.min(best_sub_summary$bic)
+coef(best_sub, which.min(best_sub_summary$bic))
+
+```
+Lasso Regression
+```{r}
+# Prepare input for glmnet (X must be a matrix, Y must be a vector)
+X <- model.matrix(crim ~ ., data = Boston)[, -1]  # Remove intercept
+Y <- Boston$crim
+
+# Fit lasso with cross-validation
+set.seed(123)
+cv_lasso <- cv.glmnet(X, Y, alpha = 1)
+
+# Plot cross-validation error
+plot(cv_lasso)
+title("Lasso Cross-Validation", line = 2.5)
+
+# Get optimal lambda and coefficients
+lambda_best <- cv_lasso$lambda.min
+lasso_model <- glmnet(X, Y, alpha = 1, lambda = lambda_best)
+coef(lasso_model)
+
+```
+Both Lasso and Best Subset Selection choose to include the predictors lstat, black and rad. These are the most important variables when making a model for this dataset. 
+
+### Part B
+```{r}
+
+# Split data: 70% training, 30% test
+train_idx <- sample(1:nrow(Boston), size = 0.7 * nrow(Boston))
+train <- Boston[train_idx, ]
+test <- Boston[-train_idx, ]
+
+# Best Subset Selection
+# Fit on training
+best_fit <- regsubsets(crim ~ ., data = train, nvmax = 13)
+best_summary <- summary(best_fit)
+
+# Find model size with lowest BIC
+best_k <- which.min(best_summary$bic)
+
+# Get coefficients of best model
+best_coef <- coef(best_fit, best_k)
+predict.regsubsets <- function(object, newdata, id) {
+  # Get model coefficients for the specified size
+  coefi <- coef(object, id = id)
+  
+  # Create full model matrix
+  mat <- model.matrix(crim ~ ., newdata)
+  
+  # Keep only columns corresponding to selected predictors
+  mat <- mat[, names(coefi), drop = FALSE]  # match by name
+  
+  # Return predicted values
+  return(as.vector(mat %*% coefi))
+}
+
+
+
+# Predict and compute test MSE
+pred_best <- predict.regsubsets(best_fit, test, best_k)
+mse_best <- mean((test$crim - pred_best)^2)
+
+# Lasso
+
+# Prepare matrices
+x_train <- model.matrix(crim ~ ., data = train)[, -1]
+y_train <- train$crim
+x_test <- model.matrix(crim ~ ., data = test)[, -1]
+y_test <- test$crim
+
+# Fit lasso with CV
+cv_lasso <- cv.glmnet(x_train, y_train, alpha = 1)
+lambda_best <- cv_lasso$lambda.min
+
+# Predict and compute test MSE
+pred_lasso <- predict(cv_lasso, s = lambda_best, newx = x_test)
+mse_lasso <- mean((y_test - pred_lasso)^2)
+
+# Print results
+cat("Validation Set MSE:\n")
+cat("Best Subset Selection:", round(mse_best, 3), "\n")
+cat("Lasso:", round(mse_lasso, 3), "\n")
+
+```
+
+While both models perform well, I would use the Lasso model for prediction purposes. If my objective was a simple, easily explainable model, I would choose the Best Subset Selection model.
+
+### Part C
+No, my chosen model does not include all the predictors in the dataset. For example, tax and age were determined by all models to be the least relevant and including them might actually diminish the models performance.
+
+
+
+
+
