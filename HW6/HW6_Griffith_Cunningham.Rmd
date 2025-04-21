@@ -119,7 +119,7 @@ train <- sample(1:nrow(df), round(0.7*nrow(df)))
 ols.mod <- lm(Apps ~ ., data=df[train,])
 yhat <- predict(ols.mod, newdata = df[-train,])
 MSE <- mean((yhat - df$Apps[-train])^2)
-MSE
+cat('Test MSE for OLS: ', MSE, '\n')
 ```
 
 ## (c)
@@ -131,7 +131,7 @@ test_split <- model.matrix(Apps ~ .-1, data=df[-train,])
 ridge.cv <- cv.glmnet(train_split, df$Apps[train], alpha=0)
 yhat <- predict(ridge.cv, newx = test_split, s = ridge.cv$lambda.min)
 MSE_ridge <- mean((yhat - df$Apps[-train])^2)
-MSE_ridge
+cat('Test MSE for Ridge: ', MSE_ridge, '\n')
 
 ridge.coef <- predict(ridge.cv, type='coefficients', s=ridge.cv$lambda.min)[1:19,]
 ridge.coef
@@ -146,7 +146,7 @@ yhat <- predict(lasso.cv, newx = test_split, s = lasso.cv$lambda.min)
 MSE_lasso <- mean((yhat - df$Apps[-train])^2)
 lasso.coef <- predict(lasso.cv, type='coefficients', s=lasso.cv$lambda.min)[1:19,]
 
-MSE_lasso
+cat('Test MSE for Lasso: ', MSE_lasso, '\n')
 lasso.coef
 ```
 
@@ -172,7 +172,7 @@ M <- 17
 yhat <- predict(pcr.mod, df[-train,], ncomp = M)
 MSE_pcr <- mean((yhat - df$Apps[-train])^2)
 
-MSE_pcr
+cat('Test MSE for PCR: ', MSE_pcr, '\n')
 ```
 
 ## (f)
@@ -193,7 +193,7 @@ M <- 17
 yhat <- predict(pls.mod, df[-train,], ncomp = M)
 MSE_pls <- mean((yhat - df$Apps[-train])^2)
 
-MSE_pls
+cat('Test MSE for PLS: ', MSE_pls, '\n')
 ```
 
 ## (f)
