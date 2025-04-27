@@ -1,0 +1,218 @@
+---
+title: "HW7"
+author: "Jon Griffith and Beatrice Lowe"
+date: "2025-04-28"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ISLR2)
+library(boot)
+```
+
+# 3
+
+```{r}
+x <- seq(-2, 2, length.out=100)
+B0 <- 1
+B1 <- 1
+B2 <- -2
+
+b1 <- x
+b2 <- (x-1)^2*I(x >= 1)
+
+f <- function(x) {B0 + B1*b1 + B2*b2}
+
+plot(x, f(x), type='l', lwd=2, col='blue',
+     main = expression(f(x) == beta[0] + beta[1]*b[1](x) + beta[2]*b[2](x) + epsilon))
+```
+
+
+
+
+# 4
+
+```{r}
+x <- seq(-2, 6, length.out=500)
+B0 <- 1
+B1 <- 1
+B2 <- 3
+
+b1 <- (I(0 <= x & x <= 2)-(x-1)*I(1 <= x & x <=2))
+b2 <- (x-3)*I(3 <= x & x <= 4) + I(4 < x & x <= 5)
+
+f <- function(x) {B0 + B1*b1 + B2*b2}
+
+plot(x, f(x), type='l', lwd=2, col='blue',
+     main = expression(f(x) == beta[0] + beta[1]*b[1](x) + beta[2]*b[2](x) + epsilon))
+```
+
+
+# 6
+
+## (a)
+
+```{r}
+set.seed(1)
+
+cv.error.10 <- rep(NA, 10)
+glm.fits <- vector('list', 10)
+
+for (i in 1:10){
+  glm.fits[[i]] <- glm(wage ~ poly(age, i), data=Wage)
+  cv.error.10[i] <- cv.glm(Wage, glm.fits[[i]], K=10)$delta[1]
+}
+cat('Min MSE Degree',which.min(cv.error.10), '\n')
+do.call(anova, c(glm.fits, test='F'))
+```
+
+```{r}
+plot(1:10, cv.error.10, type='b',
+     main = '10-Fold CV for Degree 1-10 Poly',
+     xlab = 'Degree',
+     ylab = 'MSE')
+abline(v = which.min(cv.error.10))
+```
+
+\textcolor{blue}{We see from 10-fold CV that the minimum MSE comes from the degree 9 polynomial, but when we plot all corresponding MSE's to each degree, we see that degree 9 only has a marginal advantage over all but degree 1. Using the ANOVA test, we see that all polynomials above degree three, except for nine, are not statistically significant and we deduce from this result that degree three polynomial is probably the optimal degree. We plot this below.}
+
+```{r}
+agelims <- range(Wage$age)
+age.grid <- seq(from=agelims[1], to=agelims[2])
+preds <- predict(glm(wage ~ poly(age, 3), data=Wage), newdata=list(age=age.grid), se=TRUE)
+se.bands <- cbind(preds$fit + 2*preds$se.fit, preds$fit - 2*preds$se.fit)
+
+plot(Wage$age, Wage$wage,
+     main = 'Degree 3 Poly Fit w/ 95% CI',
+     xlab = 'Age',
+     ylab = 'Wage')
+lines(age.grid, preds$fit, lwd=2, col='blue')
+matlines(age.grid, se.bands, lwd=1, col='blue', lty=3)
+```
+
+## (b)
+
+```{r}
+set.seed(1)
+
+cv.error.10 <- rep(NA, 10)
+
+for (i in 2:10){
+  Wage$age.cut = cut(Wage$age, i)
+  cv.error.10[i] <- cv.glm(Wage, glm(wage ~ age.cut, data=Wage), K=10)$delta[1]
+}
+cat('Min MSE Cut',which.min(cv.error.10), '\n')
+```
+
+```{r}
+plot(1:10, cv.error.10, type='b',
+     main = '10-Fold CV for Step Function Cuts 1-10 \n Optimal: 8',
+     xlab = 'Number of Cuts',
+     ylab = 'MSE')
+abline(v = which.min(cv.error.10))
+```
+
+\textcolor{blue}{We see from our 10-fold CV results testing cuts 2-10 that the optimal number of cuts based on MSE is eight cuts. We plot this below.}
+
+```{r}
+agelims <- range(Wage$age)
+age.grid <- seq(from=agelims[1], to=agelims[2])
+preds <- predict(glm(wage ~ cut(age, 8), data=Wage), newdata=list(age=age.grid), se=TRUE)
+se.bands <- cbind(preds$fit + 2*preds$se.fit, preds$fit - 2*preds$se.fit)
+
+plot(Wage$age, Wage$wage,
+     main = 'Stepwise Fit w/ 95% CI: 8 Cuts',
+     xlab = 'Age',
+     ylab = 'Wage')
+lines(age.grid, preds$fit, lwd=2, col='blue')
+matlines(age.grid, se.bands, lwd=1, col='blue', lty=3)
+```
+
+# 9
+
+## (a)
+
+```{r}
+head(Boston)
+```
+
+```{r}
+poly.fit <- glm(nox ~ poly(dis, 3), data=Boston)
+summary(poly.fit)
+```
+
+```{r}
+dis.range <- range(Boston$dis)
+dis.grid <- seq(dis.range[1], dis.range[2], length.out=100)
+preds <- predict(poly.fit, newdata=list(dis = dis.grid))
+
+plot(Boston$dis, Boston$nox,
+     main='Degree 3 Poly Fit: dis VS nox',
+     xlab='dis',
+     ylab='nox')
+lines(dis.grid, preds, lwd=2, col='red')
+```
+
+## (b)
+
+```{r}
+dis_range <- range(Boston$dis)
+dis.grid <- seq(dis_range[1], dis_range[2], length.out=100)
+rss_vec <- rep(NA, 10)
+pred_mat <- matrix(NA, nrow=100, ncol=10)
+
+for (i in 1:10){
+  fit <- glm(nox ~ poly(dis, i), data=Boston)
+  pred_mat[,i] <- predict(fit, newdata=list(dis = dis.grid))
+  rss_vec[i] <- sum(fit$residuals^2)
+}
+```
+
+```{r}
+plot(Boston$dis, Boston$nox,
+     main='Degree 1-10 Poly Fits: dis VS nox',
+     xlab='dis',
+     ylab='nox')
+matlines(dis.grid, pred_mat, lty=1, lwd=2, col=c(1:10))
+legend('topright', legend=paste('Degree',1:10, ': RSS =', round(rss_vec[1:10],2)), col=c(1:10), lty=1, cex=0.6)
+```
+
+\textcolor{blue}{We see in the above plot of 10 different poly fits, from degree one to degree ten, that degree one does poorly but degree two through ten are relatively close. The best degrees are degree nine and degree ten, though it is important to note that tail behavior becomes more extreme at higher order polynomials. This holds true especially for the degree nine and degree ten fit, suggesting overfitting.}
+
+
+## (c)
+
+```{r}
+set.seed(1)
+
+cv.error.10 <- rep(NA, 10)
+for (i in 1:10){
+  fit <- glm(nox ~ poly(dis, i), data=Boston)
+  cv.error.10[i] <- cv.glm(Boston, fit, K=10)$delta[1]
+}
+```
+
+```{r}
+plot(1:10, cv.error.10, type='b',
+     main='Boston: nox VS dis \n MSE for 10-Fold CV on Degree 1-10 Poly fit \n Optimal = 4',
+     xlab='Degree Fit',
+     ylab='MSE')
+abline(v=which.min(cv.error.10))
+```
+
+```{r}
+plot(Boston$dis, Boston$nox,
+     main='Degree 4 Poly Fit: dis VS nox',
+     xlab='dis',
+     ylab='nox')
+matlines(dis.grid, pred_mat[,4], lty=1, lwd=2, col=4)
+legend('topright', legend=paste('Degree 4'), col=4, lty=1)
+```
+
+\textcolor{blue}{Using 10-fold CV on degrees one through ten polynomial fits, we obtained four degrees as the optimal fit based on minimizing MSE. It performed relatively well when just fitting the data and recording the RSS, relative to the other fits in the plot in (b). But on that same plot, you can see extreme tail behavior for higher order polynomials which would point to overfitting. Thus, four degrees makes sense since the tail behavior was modest while still giving accurate predictions.}
+
+
